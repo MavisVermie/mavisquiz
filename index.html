@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HTML Quiz Battle - Lobby Edition</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, get, update, child } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEaNimVtrVF4L3rvqj8vuTnWgs-RCI7Sc",
+      authDomain: "quizz-17b7c.firebaseapp.com",
+      projectId: "quizz-17b7c",
+      storageBucket: "quizz-17b7c.firebasestorage.app",
+      messagingSenderId: "279096437941",
+      appId: "1:279096437941:web:a0321bb6d1a8dbe356a2fc",
+      databaseURL: "https://quizz-17b7c-default-rtdb.firebaseio.com/"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const questions = [
+      { question: "What does HTML stand for?", options: ["Hyper Trainer Marking Language", "HyperText Markup Language", "Hyper Text Marketing Language", "HighText Marking Language"], answer: 1 },
+      { question: "Which HTML tag is used to define a paragraph?", options: ["<h1>", "<p>", "<br>", "<para>"], answer: 1 },
+      { question: "Is HTML case-sensitive?", options: ["Yes", "No", "Only attributes", "Only tag names"], answer: 1 },
+      { question: "Which tag is used for line breaks?", options: ["<lb>", "<br>", "<break>", "<hr>"], answer: 1 }
+    ];
+
+    let roomId = prompt("Enter a room ID to join or create:");
+    let playerName = prompt("Enter your player name:");
+    const roomRef = ref(db, 'rooms/' + roomId);
+
+    let playerIndex = 0;
+
+    get(roomRef).then(snapshot => {
+      if (!snapshot.exists()) {
+        set(roomRef, {
+          players: [playerName],
+          scores: [0, 0],
+          turn: 0,
+          currentQuestion: 0
+        });
+      } else {
+        const data = snapshot.val();
+        if (data.players.length === 1) {
+          playerIndex = 1;
+          data.players.push(playerName);
+          update(roomRef, data);
+        } else {
+          alert("Room full. Try another ID.");
+          location.reload();
+        }
+      }
+    });
+
+    function renderQuestion(data) {
+      const q = questions[data.currentQuestion];
+      document.getElementById('question').textContent = q.question;
+      document.getElementById('options').innerHTML = '';
+      document.getElementById('current-player').textContent = data.players[data.turn];
+
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'option';
+        btn.textContent = opt;
+        btn.disabled = data.turn !== playerIndex;
+        btn.onclick = () => submitAnswer(idx, btn);
+        document.getElementById('options').appendChild(btn);
+      });
+
+      document.getElementById('score').textContent = `${data.players[0]}: ${data.scores[0]} | ${data.players[1] || 'Waiting...'}: ${data.scores[1]}`;
+    }
+
+    function submitAnswer(index, btn) {
+      get(roomRef).then(snapshot => {
+        if (snapshot.exists()) {
+          let data = snapshot.val();
+          const correct = index === questions[data.currentQuestion].answer;
+          if (correct) {
+            btn.style.backgroundColor = 'lightgreen';
+            data.scores[playerIndex]++;
+          } else {
+            btn.style.backgroundColor = 'lightcoral';
+          }
+          setTimeout(() => {
+            if (data.currentQuestion >= questions.length - 1) {
+              const [p1, p2] = data.players;
+              const [s1, s2] = data.scores;
+              const result = s1 === s2 ? "It's a tie!" : s1 > s2 ? `${p1} wins!` : `${p2} wins!`;
+              document.querySelector('.quiz-box').innerHTML = `<h2>${result}</h2><button onclick="location.reload()">Play Again</button>`;
+            } else {
+              data.currentQuestion++;
+              data.turn = 1 - data.turn;
+              update(roomRef, data);
+            }
+          }, 1000);
+        }
+      });
+    }
+
+    onValue(roomRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.players.length === 2) renderQuestion(data);
+        else document.getElementById('question').textContent = 'Waiting for another player to join...';
+      }
+    });
+  </script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #74ebd5, #acb6e5);
+      text-align: center;
+      padding: 30px;
+      color: #333;
+    }
+    .quiz-box {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      transition: 0.3s;
+    }
+    .quiz-box:hover {
+      box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+    }
+    .question {
+      font-size: 20px;
+      margin-bottom: 25px;
+    }
+    .option {
+      display: block;
+      background: #f0f0f0;
+      border: none;
+      padding: 12px;
+      margin: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .option:hover {
+      background: #d0e6ff;
+    }
+    .score {
+      margin-top: 20px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="quiz-box">
+    <h2>HTML Quiz Battle - Lobby Mode</h2>
+    <p><strong>Current Turn:</strong> <span id="current-player">Waiting...</span></p>
+    <div class="question" id="question"></div>
+    <div id="options"></div>
+    <div class="score" id="score">Loading...</div>
+  </div>
+</body>
+</html>
